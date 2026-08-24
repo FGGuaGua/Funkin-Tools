@@ -171,7 +171,17 @@ export async function toPsych(root:Root,newVer:Boolean = false): Promise<PsychZi
                 var noteType = note.type ?? -1
 
                 if (noteType >= 0)
-                    notedata[3] = root.noteTypes[noteType]
+                {
+                    switch(root.noteTypes[noteType])
+                    {
+                        case "__ALT_NOTE__":
+                            notedata[3] = "Alt Animation"
+                            break;
+                        default:
+                            notedata[3] = root.noteTypes[noteType]
+                            break;
+                    }
+                }
 
                 if (sL.position == "girlfriend")
                     notedata[3] = "GF Sing"
