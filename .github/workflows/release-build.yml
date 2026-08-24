@@ -64,15 +64,36 @@ jobs:
             npx tauri android build --apk --target aarch64
           }
 
+      # 收集 Windows Debug 的 exe（位于 target/debug）
+      - name: Collect Windows debug artifact
+        if: matrix.platform == 'windows' && matrix.profile == 'debug'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/windows/debug | Out-Null
+          Copy-Item src-tauri/target/debug/funkin-tools.exe artifacts/windows/debug/funkin-tools-debug.exe
+
+      # 收集 Windows Release 产物：exe 与安装包(msi/nsis)分开放置
+      - name: Collect Windows release artifacts (exe & installers)
+        if: matrix.platform == 'windows' && matrix.profile == 'release'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/windows/release/exe, artifacts/windows/release/installers | Out-Null
+          Copy-Item src-tauri/target/release/funkin-tools.exe artifacts/windows/release/exe/funkin-tools.exe
+          Copy-Item src-tauri/target/release/bundle/msi/*.msi artifacts/windows/release/installers/ -ErrorAction SilentlyContinue
+          Copy-Item src-tauri/target/release/bundle/nsis/*-setup.exe artifacts/windows/release/installers/ -ErrorAction SilentlyContinue
+
+      # 收集 Android APK：递归找出 apk 并展平到简洁目录，去掉 gen/android/app/build/outputs 深层嵌套
+      - name: Collect Android APK
+        if: matrix.platform == 'android'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/android/${{ matrix.profile }} | Out-Null
+          Get-ChildItem src-tauri/gen/android/app/build/outputs/apk -Recurse -Filter *.apk |
+            ForEach-Object { Copy-Item $_.FullName ("artifacts/android/${{ matrix.profile }}/" + $_.Name) }
+
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: funkin-tools-${{ matrix.platform }}-${{ matrix.profile }}
-          path: |
-            src-tauri/target/release/funkin-tools.exe
-            src-tauri/target/release/**/*.msi
-            src-tauri/target/release/**/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*
-            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-            src-tauri/target/android/**/*.apk
-          if-no-files-found: ignore
+          path: artifacts/
+          if-no-files-found: error
