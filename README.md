@@ -20,7 +20,7 @@ The content of the conversion includes but is not limited to
 - Stage
 
 
-## Project progress \
+## Project progress
 Up to now, I haven't written anything...
 - [ ] Basic interface
 - [ ] Web adaptation
