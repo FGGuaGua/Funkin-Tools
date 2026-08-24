@@ -22,6 +22,6 @@ The content of the conversion includes but is not limited to
 
 Project progress
 Up to now, I haven't written anything...
-- [] Basic interface
-- [] Web adaptation
+- [ ] Basic interface
+- [ ] Web adaptation
 - [X] Codename Chart -> Psych Chart
