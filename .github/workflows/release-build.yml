@@ -1,0 +1,78 @@
+name: Release Build
+
+# 发布构建：同时编译 Windows / Android 的 Debug / Release 四个版本
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: ${{ matrix.platform }} ${{ matrix.profile }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows, android]
+        profile: [debug, release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Windows Debug：仅 cargo build 编译 Rust 后端
+      - name: Build Windows debug
+        if: matrix.platform == 'windows' && matrix.profile == 'debug'
+        run: cargo build --manifest-path src-tauri/Cargo.toml
+
+      # Windows Release：tauri build 会执行 beforeBundleCommand(UPX 压缩)
+      # 并生成正式安装包；beforeBuildCommand 会自动先构建前端
+      - name: Build Windows release (with UPX)
+        if: matrix.platform == 'windows' && matrix.profile == 'release'
+        run: npx tauri build
+
+      # tauri android build 会内嵌前端 dist，需先构建前端
+      - name: Build frontend
+        if: matrix.platform == 'android'
+        run: npm run build
+
+      - name: Build Android ${{ matrix.profile }}
+        if: matrix.platform == 'android'
+        shell: pwsh
+        run: |
+          if ('${{ matrix.profile }}' -eq 'debug') {
+            npx tauri android build --debug
+          } else {
+            npx tauri android build --apk --target aarch64
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: funkin-tools-${{ matrix.platform }}-${{ matrix.profile }}
+          path: |
+            src-tauri/target/release/funkin-tools.exe
+            src-tauri/target/release/**/*.msi
+            src-tauri/target/release/**/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+            src-tauri/target/android/**/*.apk
+          if-no-files-found: ignore
