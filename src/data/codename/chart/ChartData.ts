@@ -14,7 +14,7 @@ export const EventData = z.object({
 
 export const StrumLineData = z.object({
   keyCount: z.number().nullish().default(4),
-  notes: z.array(NoteData),
+  notes: z.array(NoteData).nullish(),
   visible: z.boolean().nullish().default(true),
   strumSpacing: z.number().nullish().default(1),
   strumPos: z.array(z.number()).nullish(),

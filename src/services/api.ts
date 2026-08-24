@@ -386,6 +386,85 @@ export async function saveJson(
   }
 }
 
+/** 可保存的文件内容：字符串为文本，其余为二进制（Node Buffer 也是 Uint8Array 子类，可传入） */
+export type FileData = string | Blob | ArrayBuffer | Uint8Array;
+
+/** 把 FileData 统一转成字节（供 Tauri writeFile 使用） */
+async function toBytes(data: FileData): Promise<Uint8Array> {
+  if (typeof data === 'string') {
+    return new TextEncoder().encode(data);
+  }
+  if (data instanceof Blob) {
+    return new Uint8Array(await data.arrayBuffer());
+  }
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+  return data; // 已是 Uint8Array
+}
+
+/** 把 FileData 统一转成 Blob（供 Web 下载使用） */
+function toBlob(data: FileData): Blob {
+  if (data instanceof Blob) return data;
+  if (typeof data === 'string') {
+    return new Blob([data], { type: 'text/plain;charset=utf-8' });
+  }
+  if (data instanceof ArrayBuffer) {
+    return new Blob([data], { type: 'application/octet-stream' });
+  }
+  // Uint8Array：拷贝一份，规避 ArrayBufferLike（可能含 SharedArrayBuffer）与 BlobPart 的类型冲突
+  return new Blob([new Uint8Array(data)], { type: 'application/octet-stream' });
+}
+
+/**
+ * 直接把内容保存为文件，不弹保存对话框（Win / Android 直接写入指定路径）。
+ * 适用于已经知道目标路径的场景，例如保存到用户之前选择的文件夹中。
+ * @param data - 文件内容：字符串为文本；Blob / ArrayBuffer / Uint8Array 为二进制
+ * @param filePath - 目标文件完整路径（Tauri 端，如 D:\...\chart.json 或 /storage/.../chart.json）
+ * @returns 保存成功的完整路径；失败返回 null
+ * @note Web 端浏览器无法直接写文件系统，会自动回退为浏览器下载（此时 filePath 仅用作默认文件名）。
+ */
+export async function saveFileDirect(
+  data: FileData,
+  filePath: string
+): Promise<string | null> {
+  if (isTauri()) {
+    // ---------- Tauri 分支（Win / Android）：直接写入，不弹框 ----------
+    const { writeFile } = await import('@tauri-apps/plugin-fs');
+    try {
+      await writeFile(filePath, await toBytes(data));
+      return filePath;
+    } catch (error) {
+      console.error('直接写入文件失败:', error);
+      return null;
+    }
+  } else {
+    // ---------- Web 分支（浏览器无法直接写盘，回退为下载）----------
+    const url = URL.createObjectURL(toBlob(data));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filePath.split(/[\\/]/).pop() || 'file';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return '';
+  }
+}
+
+/**
+ * 直接把对象保存为 JSON 文件（saveFileDirect 的便捷封装）。
+ * @param data - 要保存的对象（会序列化为带缩进的 JSON 文本）
+ * @param filePath - 目标文件完整路径
+ * @returns 保存成功的完整路径；失败返回 null
+ */
+export async function saveJsonDirect(
+  data: unknown,
+  filePath: string
+): Promise<string | null> {
+  return saveFileDirect(JSON.stringify(data, null, 2), filePath);
+}
+
 export async function listFiles(customPath: string):Promise<string[]>
 {
   try {

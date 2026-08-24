@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { setTitle, readJsonAt, saveJson, showMessage } from "./services/api";
+import { setTitle, showMessage, saveFileDirect } from "./services/api";
 import FunkinToolsLogo from "./components/FunkinToolsLogo.vue";
-import FilePathSelector from "./components/FilePathSelector.vue"; // 引入新组件
-import { fromCNE, type Root } from "./data/transfer/ChartData.ts";
-
+import FilePathSelector from "./components/FilePathSelector.vue";
+import { fromCNE, toPsych } from "./data/transfer/ChartData.ts";
+import JSZip from "jszip";
+import { Root as PsychRoot } from './data/psych/chart/ChartData';
 const { t, locale } = useI18n();
-watch(locale, (val) => localStorage.setItem('locale', val)); // 记住语言选择
+watch(locale, (val) => localStorage.setItem('locale', val));
 
 const greetMsg = ref("");
 const chartFolderPath = ref("");
@@ -15,11 +16,20 @@ const metaFilePath = ref("");
 
 setTitle(t("app.title"));
 
+
 async function handleProcessing() {
   try {
     const root = await fromCNE(chartFolderPath.value, metaFilePath.value);
-    //const result = await outPsych(); //别急我还没写
-    await saveJson(root, 'chart.json');
+    const result = await toPsych(root);
+    const zip = new JSZip();
+    const diff = (result.diff as string[])
+    const chart = (result.chart as PsychRoot[])
+    for (let i = 0; i <= diff.length-1; i++)
+    {
+      zip.file(result.song+"-"+diff[i]+".json", JSON.stringify(chart[i], null, 2));
+    }
+    const content = await zip.generateAsync({ type: "uint8array" });
+    await saveFileDirect(content, `${chartFolderPath.value}/test.zip`);
   } catch (e) {
     showMessage(t('messages.notCodename'),'error',t("messages.readFail"));
     console.error(e)

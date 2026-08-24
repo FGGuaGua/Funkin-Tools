@@ -7,6 +7,7 @@
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
+    "beforeBundleCommand": "src-tauri\\tools\\upx\\upx-5.2.0-win64\\upx.exe --best src-tauri\\target\\release\\funkin-tools.exe",
     "frontendDist": "../dist",
     "removeUnusedCommands": true
   },
